@@ -28,6 +28,9 @@ HTML_TEMPLATE = """
 def index():
     return render_template_string(HTML_TEMPLATE)
 
+model = whisper.load_model("base")
+
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'audio_file' not in request.files:
@@ -40,29 +43,32 @@ def upload_file():
     filename = secure_filename(file.filename)
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
-    model = whisper.load_model("base")
+    
     try:
-        with open(filepath, 'rb') as audio_file:
-            print(audio_file)
+        # Pass the file path to Whisper
+        result = model.transcribe(filepath)
+        
+        # If you want just the text:
+        transcription_text = result["text"]
 
-            model = whisper.load_model("base")
-            
-            result = model.transcribe(audio_file)
-
+        # Create a .txt version of the file
         txt_filename = os.path.splitext(filename)[0] + ".txt"
         txt_filepath = os.path.join(app.config['UPLOAD_FOLDER'], txt_filename)
-
+        
         with open(txt_filepath, 'w', encoding='utf-8') as f:
-            f.write(result)
+            f.write(transcription_text)
         
         return send_file(txt_filepath, as_attachment=True)
 
     except Exception as e:
         print("Error during transcription:", e)
         return "Error occurred while transcribing the audio.", 500
+
     finally:
+        # Clean up the uploaded file
         if os.path.exists(filepath):
             os.remove(filepath)
+
 
 if __name__ == '__main__':
     # run the dev server
